@@ -1,0 +1,14 @@
+# Ignorar todo
+*
+
+# No ignorar el propio .gitignore
+!.gitignore
+
+# No ignorar directorios (necesario para llegar a los archivos dentro)
+!*/
+
+# Archivos permitidos
+!Unidad_1/Ejercicios/Resolucion_calculadora.py
+!Unidad_1/Ejercicios/Resolucion_texto.py
+!Unidad_2/Ejercicios/Resolucion_P1_rostros.py
+!Unidad_2/Ejercicios/Resolucion_P2_mancha.py
