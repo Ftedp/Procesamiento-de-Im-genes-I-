@@ -107,6 +107,10 @@ def detectar_letra(celda):
     if hierarchy is None or len(contours) == 0:
         return 'MAL'
     
+    # Si hay más de 3 contornos → más de una letra
+    if len(contours) > 3:
+        return 'MAL'
+    
     # Contar contornos externos con área suficiente (ignorar ruido pequeño)
     n_externos = sum(1 for i, h in enumerate(hierarchy[0]) 
                     if h[3] == -1 and cv2.contourArea(contours[i]) > 20)
@@ -170,8 +174,8 @@ def corregir_examen(img_path):
 
 # --- Ejecutar sobre todos los exámenes ---
 if __name__ == '__main__':
-    examenes = ['examen_1.png', 'examen_2.png', 'examen_3.png',
-                'examen_4.png', 'examen_5.png']
+    examenes = ['TP_1/examen_1.png', 'TP_1/examen_2.png', 'TP_1/examen_3.png',
+                'TP_1/examen_4.png', 'TP_1/examen_5.png']
 
     resultados = []
     for path in examenes:
@@ -190,9 +194,7 @@ if __name__ == '__main__':
 
 
 # corregir_examen('examen_1.png')
-# corregir_examen('examen_2.png')
+# corregir_examen('TP_1/examen_2.png')
 # corregir_examen('examen_3.png')
 # corregir_examen('examen_4.png')
 # corregir_examen('examen_5.png')
-
-

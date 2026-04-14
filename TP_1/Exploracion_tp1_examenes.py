@@ -563,3 +563,26 @@ for i, path in enumerate(['TP_1/examen_1.png', 'TP_1/examen_2.png', 'TP_1/examen
     _, enc_tmp = extraer_celdas(img_tmp, filas_tmp, columnas_tmp)
     print(f"Examen {i+1}: ancho encabezado = {enc_tmp.shape[1]}")
 
+#examen 2 
+img2 = cv2.imread('TP_1/examen_2.png', cv2.IMREAD_GRAYSCALE)
+filas2, columnas2 = detectar_lineas(img2)
+celdas2, _ = extraer_celdas(img2, filas2, columnas2)
+print(detectar_letra(celdas2[2]))
+
+celda2_th = (celdas2[2] < 200).astype(np.uint8)
+_, _, stats_c2, _ = cv2.connectedComponentsWithStats(celda2_th, 8, cv2.CV_32S)
+stats_c2_f = stats_c2[(stats_c2[:, 4] > 50) & (stats_c2[:, 4] < 200)]
+guion2 = stats_c2_f[(stats_c2_f[:, 2] > 50) & (stats_c2_f[:, 3] <= 2)]
+x_g, y_g, w_g = guion2[0,0], guion2[0,1], guion2[0,2]
+zona2 = celdas2[2][y_g-15:y_g, x_g:x_g+w_g]
+
+plt.figure(figsize=(4,3))
+plt.imshow(zona2, cmap='gray')
+plt.title('Zona celda 2')
+plt.axis('off')
+plt.show()
+
+zona2_th = (zona2 < 200).astype(np.uint8)
+contours2, hierarchy2 = cv2.findContours(zona2_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+for i, (c, h) in enumerate(zip(contours2, hierarchy2[0])):
+    print(f"Contorno {i}: area={cv2.contourArea(c):.1f} padre={h[3]}")
