@@ -40,11 +40,23 @@ def extraer_celdas(img, filas, columnas):
     encabezado = img[0:filas[1], columnas[0]:columnas[3]]
     return celdas, encabezado
 
+def detectar_campos(encabezado):
+    enc_th = (encabezado < 200).astype(np.uint8)
+    enc_rows = np.sum(enc_th, axis=1)
+    fila_linea = np.where(enc_rows > 200)[0][0]
+    fila = enc_th[fila_linea, :]
+    diff_fila = np.diff(fila, prepend=0, append=0)
+    inicios_campos = np.where(diff_fila == 1)[0]
+    fines_campos   = np.where(diff_fila == -1)[0]
+    return inicios_campos, fines_campos
+
 def validar_encabezado(encabezado):
     # Crops de cada campo
-    campo_name  = encabezado[:, 42:217]
-    campo_date  = encabezado[:, 279:354]
-    campo_class = encabezado[:, 395:530]
+    inicios_campos, fines_campos = detectar_campos(encabezado)
+
+    campo_name  = encabezado[:, inicios_campos[0]:fines_campos[0]]
+    campo_date  = encabezado[:, inicios_campos[1]:fines_campos[1]]
+    campo_class = encabezado[:, inicios_campos[2]:fines_campos[2]]
 
     # --- Name ---
     campo_name_th = (campo_name < 200).astype(np.uint8)
@@ -180,7 +192,8 @@ if __name__ == '__main__':
     resultados = []
     for path in examenes:
         aprobado, encabezado = corregir_examen(path)
-        name_crop = encabezado[:, 39:217]
+        inicios_campos, fines_campos = detectar_campos(encabezado)
+        name_crop = encabezado[:, inicios_campos[0]:fines_campos[0]]
         resultados.append((name_crop, aprobado))
 
 
@@ -192,9 +205,3 @@ if __name__ == '__main__':
         axes[i].axis('off')
     plt.show()
 
-
-# corregir_examen('examen_1.png')
-# corregir_examen('TP_1/examen_2.png')
-# corregir_examen('examen_3.png')
-# corregir_examen('examen_4.png')
-# corregir_examen('examen_5.png')
