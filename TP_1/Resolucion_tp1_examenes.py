@@ -197,7 +197,7 @@ def detectar_letra(celda):
     celda_th = (celda < 200).astype(np.uint8)
 
     _, _, stats, _ = cv2.connectedComponentsWithStats(celda_th, 8, cv2.CV_32S)
-    #Filtramos por area para deshacernos del fondoe y del ruido (50-200 porque las letras de respuestas son las mas grandes)
+    #Filtramos por area para deshacernos del fondo y del ruido (50-200 porque las letras de respuestas son las mas grandes)
     stats_filtradas = stats[(stats[:, 4] > 50) & (stats[:, 4] < 200)]
     #Identificamos el guion (el mas ancho y bajo)
     guion = stats_filtradas[(stats_filtradas[:, 2] > 50) & (stats_filtradas[:, 3] <= 2)]
@@ -211,7 +211,7 @@ def detectar_letra(celda):
     w_guion = guion[0, 2]
 
     #crop quitamos del alto la primera linea que incluye texto de la pregunta.
-    zona = celda[y_guion-15:y_guion, x_guion:x_guion + w_guion]
+    zona = celda[y_guion-14:y_guion, x_guion:x_guion + w_guion]
     zona_th = (zona < 200).astype(np.uint8)
 
     #zona vacia, sin trazo manuscrito.
@@ -242,29 +242,33 @@ def detectar_letra(celda):
 
     if n_huecos > 2:
         return 'MAL'
-
+    
     if n_huecos == 2:
         return 'B'
     elif n_huecos == 0:
         return 'C'
-    elif n_huecos == 1:
-        # Para distinguir A de D: el hueco de A está en la mitad superior
-        # del bounding box externo, el de D en la mitad inferior
-        contorno_externo_idx = [i for i, h in enumerate(hierarchy[0]) if h[3] == -1][0]
-        x_ext, y_ext, w_ext, h_ext = cv2.boundingRect(contours[contorno_externo_idx])
+    elif n_huecos == 1:       
+            # # Obtenemos el contorno externo para aislar la letra
+            contorno_externo_idx = [i for i, h in enumerate(hierarchy[0]) if h[3] == -1][0]
+            x_ext, y_ext, w_ext, h_ext = cv2.boundingRect(contours[contorno_externo_idx])
+            
+            # Recortamos la letra de la zona binarizada para un análisis limpio
+            img_letra = zona_th[y_ext:y_ext+h_ext, x_ext:x_ext+w_ext]
+            
+            # Calculamos el perfil de proyección vertical (Unidad 1 y 3)
+            # Sumamos los píxeles blancos (valor 1) por cada columna.
+            suma_vertical_columnas = np.sum(img_letra, axis=0)
+            
+            # se busca la línea recta:
+            # Si alguna columna tiene una suma de píxeles mayor al 80% de la altura total
+            # de la letra, asumimos que existe una línea vertical (característica de la 'D').
+            umbral_linea_recta = 0.8 * h_ext
+            tiene_linea_vertical = np.any(suma_vertical_columnas > umbral_linea_recta)
 
-        contorno_hueco_idx = [i for i, h in enumerate(hierarchy[0]) if h[3] != -1][0]
-        x_h, y_h, w_h, h_h = cv2.boundingRect(contours[contorno_hueco_idx])
-
-        centro_hueco = y_h + h_h/2
-        centro_letra = y_ext + h_ext/2
-
-        if centro_hueco < centro_letra:
-            return 'A'
-        else:
-            return 'D'
-    else:
-        return 'MAL'
+            if tiene_linea_vertical:
+                return 'D'
+            else:
+                return 'A'
 
 
 def corregir_examen(img_path):
@@ -324,3 +328,5 @@ if __name__ == '__main__':
                         color='green' if aprobado else 'red')
         axes[i].axis('off')
     plt.show()
+
+
