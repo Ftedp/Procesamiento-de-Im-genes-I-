@@ -5,13 +5,14 @@ import sys
 sys.path.append('TP_1')
 from Resolucion_tp1_examenes import corregir_examen, detectar_lineas, agrupar_lineas, extraer_celdas, validar_encabezado, detectar_letra
 
-
-img = cv2.imread('examen_2.png', cv2.IMREAD_GRAYSCALE)
+#importacion imagen
+img = cv2.imread('TP_1/examen_2.png', cv2.IMREAD_GRAYSCALE)
 print(img.shape)
 print(img.dtype)
 print(f"Min: {img.min()}, Max: {img.max()}")
 plt.imshow(img, cmap='gray'), plt.show(block=False)
 
+#Umbralizacion
 img_th = (img.copy() < 200).astype(np.uint8)
 
 plt.subplot(1, 2, 1); plt.imshow(img, cmap='gray');    plt.title('Original'); plt.axis('off')
@@ -55,11 +56,11 @@ ax_proj2.grid(True)
 plt.tight_layout()
 plt.show()
 
-
+#Umbrales para obtener lineas (filas y columnas) necesarias.
 th_row = 290
 th_col = 400
 
-# Antes de agrupar
+# Antes de agrupar (algunas lineas ocupan varios pixeles) el np.where agarrar runs de pixeles que debemos agrupar.
 raw_h = np.where(img_rows > th_row)[0]
 raw_v = np.where(img_cols > th_col)[0]
 print(f"ANTES - h_lines: {raw_h}  -> {len(raw_h)}")
@@ -84,7 +85,8 @@ plt.show(block=False)
 print(f"filas: {filas}  -> {len(filas)}")
 print(f"columnas: {columnas}  -> {len(columnas)}")
 
-# entre 0 y 32 se encuentra el encabezado
+'''
+# entre 0 y filas[1]=53 se encuentra el encabezado
 # filas[0]=32, filas[1]=53 -> margen
 # filas[1]=53 a filas[2]=180 -> fila de preguntas 1 y 6
 # filas[2]=180 a filas[3]=305 -> fila de preguntas 2 y 7
@@ -94,26 +96,29 @@ print(f"columnas: {columnas}  -> {len(columnas)}")
 # para columnas:
 # columnas[0]=17 a columnas[1]=259 -> columna izquierda (preguntas 1-5)
 # columnas[2]=322 a columnas[3]=565 -> columna derecha (preguntas 6-10)
-
+'''
 #-----------------------------------------------------------------------------EXTRAER CELDAS----------------------------------------------------------------------
 #crop de celdas y encabezado
 celdas = {}
 
+#Agrupamos filas en boxes de preguntas
 rango_filas = [(filas[1], filas[2]),   # pregunta 1 y 6
          (filas[2], filas[3]),   # pregunta 2 y 7
          (filas[3], filas[4]),   # pregunta 3 y 8
          (filas[4], filas[5]),   # pregunta 4 y 9
          (filas[5], filas[6])]   # pregunta 5 y 10
 
+#Agrupamos columnas 
 rango_cols = [(columnas[0], columnas[1]),    # columna izquierda
         (columnas[2], columnas[3])]    # columna derecha
 
+#Crop de las celdas
 for i, (y1, y2) in enumerate(rango_filas):
     for j, (x1, x2) in enumerate(rango_cols):
         nro = i + 1 if j == 0 else i + 6
         celdas[nro] = img[y1:y2, x1:x2]
     
-
+#mostramos celdas
 fig, axes = plt.subplots(2, 5, figsize=(18, 6))
 for nro, celda in celdas.items():
     fila = 0 if nro <= 5 else 1
@@ -125,6 +130,7 @@ plt.suptitle('Celdas de preguntas')
 plt.tight_layout()
 plt.show()
 
+#Hacemos el crop del encabezado
 encabezado = img[0:int(filas[1]), int(columnas[0]):int(columnas[3])] 
 print(encabezado.shape)
 plt.figure(figsize=(10, 2))
@@ -133,53 +139,70 @@ plt.title('Encabezado')
 plt.axis('off')
 plt.show()
 
-#chequeo encabezado
-#Nombre 2 palabras 25 caracteres max
-#date 8 caracteres
-#class caracter unico
-
+#Umbralizado del encabezado.
 enc_th = (encabezado < 200).astype(np.uint8)
-enc_cols = np.sum(enc_th, axis=0)
 
+enc_cols = np.sum(enc_th, axis=0) #proyeccion de columnas
+
+#graficamos para detectar donde comienzan y terminan las lineas donde esta el texto.
 plt.figure(figsize=(12, 3))
 plt.subplot(1, 2, 1); plt.imshow(encabezado, cmap='gray'); plt.axis('off')
 plt.subplot(1, 2, 2); plt.plot(enc_cols); plt.grid(True); plt.title('Proyección columnas encabezado')
 plt.tight_layout()
 plt.show()
 
-#-------------------------------------------------------------CROP ENCABEZADO------------------------------------------------------
-#--------------------crop de las etiquetas del encabezado-------------------------------------------
-campo_name  = encabezado[:, 42:233]
-campo_date  = encabezado[:, 279:354]
-campo_class = encabezado[:, 404:530]
+#-------------------------------------------------------------CROP ENCABEZADO------------------------------------------------------ 
+enc_rows = np.sum(enc_th, axis=1) #proyeccion por filas
 
-fig, axes = plt.subplots(1, 3, figsize=(12, 2))
+#buscamos la linea horizontal mas larga
+fila_linea = np.where(enc_rows > 200)[0][0]
+fila = enc_th[fila_linea, :]
+
+#Identificamos lo que abarca cada segmento de linea.
+#agregamos un cero al principio y al final de cada transicion
+diff_fila = np.diff(fila, prepend=0, append=0)
+#
+inicios_campos = np.where(diff_fila == 1)[0]
+fines_campos   = np.where(diff_fila == -1)[0]
+
+
+#--------------------crop de las etiquetas del encabezado-------------------------------------------
+campo_name  = encabezado[:, inicios_campos[0]:fines_campos[0]]
+campo_date  = encabezado[:, inicios_campos[1]:fines_campos[1]]
+campo_class = encabezado[:, inicios_campos[2]:fines_campos[2]]
+
+fig, axes = plt.subplots(1, 3, figsize=(12, 3))
 axes[0].imshow(campo_name,  cmap='gray'); axes[0].set_title('Name');  axes[0].axis('off')
 axes[1].imshow(campo_date,  cmap='gray'); axes[1].set_title('Date');  axes[1].axis('off')
 axes[2].imshow(campo_class, cmap='gray'); axes[2].set_title('Class'); axes[2].axis('off')
 plt.tight_layout()
 plt.show()
 
-#deteccion de nombre
+#----------------------Umbralizacion para deteccion de nombre
 campo_name_th = (campo_name < 200).astype(np.uint8)
 
+# Detectar componentes conectadas (grupos de píxeles conectados = caracteres)
+# Devuelve: cantidad de componentes, imagen etiquetada, estadísticas (x,y,w,h,area), centroides
+#ANALISIS DE COMPONENTES CONEXAS.
 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(campo_name_th, 8, cv2.CV_32S)
 
+# imprimimos cantidad de componentes
 print(f"num_labels: {num_labels}")
-# Representacion de valores: x, y, w, h, area por cada fila (componente)
+# Representacion de valores: (x, y, w, h, area) por cada fila (componente)
 
 print(f"stats:\n{stats}")
 
-#filtramos por area (quitamos fondo y fin de linea)
+#filtramos por area (quitamos fondo y fin de linea) 
 stats_filtradas = stats[(stats[:, 4] > 20) & (stats[:, 4] < 100)]
 print(f"Componentes válidas: {len(stats_filtradas)}")
 print(stats_filtradas)
 
-# identificamos umbral entre letras (para distinguir palabras)
+# identificamos gaps entre letras (para distinguir palabras)
 posiciones_x = stats_filtradas[:, 0]
 gaps = np.diff(posiciones_x)
 print(gaps)
 
+#Espacio que marca una division de palabras
 umbral_espacio = 15
 n_espacios = np.sum(gaps > umbral_espacio)
 n_palabras = n_espacios + 1
@@ -245,20 +268,20 @@ else:
 
 
 #------------------------celdas con preguntas ----------------------------------
-
+#analisis celda 1
 celda1_th = (celdas[1] < 200).astype(np.uint8)
 num_labels, labels, stats_c1, centroids = cv2.connectedComponentsWithStats(celda1_th, 8, cv2.CV_32S)
 print(f"num_labels: {num_labels}")
 print(stats_c1)
 
-# Representacion de valores: x, y, w, h, area por cada fila (componente)
+# Representacion de valores: x, y, w, h, area por cada fila (componente) ELECCION EMPIRICA (dejando de lado el ruido.)
 th_area_min = 50
 th_area_max = 200
 stats_c1_filtradas = stats_c1[(stats_c1[:, 4] > th_area_min) & (stats_c1[:, 4] < th_area_max)]
 print(f"Componentes filtradas: {len(stats_c1_filtradas)}")
 print(stats_c1_filtradas)
 
-# Encontrar el guión: ancho > 50 y alto == 1
+# Encontrar el guión: ancho > 50 y alto <= 2
 guion = stats_c1_filtradas[(stats_c1_filtradas[:, 2] > 50) & (stats_c1_filtradas[:, 3] <= 2)]
 print(f"Guión encontrado en: {guion}")
 
@@ -272,10 +295,12 @@ plt.title('Zona de respuesta')
 plt.axis('off')
 plt.show()
 
+#umbralizamos zona de pregunta y respuesta y obtenemos las stats.
 zona_th = (zona_respuesta < 200).astype(np.uint8)
 num_labels, labels, stats_zona, centroids = cv2.connectedComponentsWithStats(zona_th, 8, cv2.CV_32S)
 print(stats_zona)
 
+#Imprimimos todas las letras para encontrar las medidas de la B.
 stats_zona_f = stats_zona[(stats_zona[:, 4] > 20) & (stats_zona[:, 4] < 50)]
 for comp in stats_zona_f:
     x, y, w, h, area = comp
@@ -288,21 +313,35 @@ for comp in stats_zona_f:
 
 # x=139 y=23 area=35 --> B respuesta.
  
-
+#medidas del guion.
 x_guion = guion[0, 0]
 y_guion = guion[0, 1]
 w_guion = guion[0, 2]
 
-zona_guion = zona_respuesta[y_guion-15:y_guion, x_guion:x_guion + w_guion]
+#identificamos la zona de respuesta por encima del guion.
+zona_guion = zona_respuesta[y_guion-14:y_guion, x_guion:x_guion + w_guion]
 
+#Visualizamos.
 plt.figure(figsize=(4, 3))
 plt.imshow(zona_guion, cmap='gray')
 plt.title('Zona del guión')
 plt.axis('off')
 plt.show()
 
+#Umbralizamos zona respuesta. y en base al contorno obtenemos que letra es.
 zona_guion_th = (zona_guion < 200).astype(np.uint8)
+
+#Contours es una lista de arrays de contornos, cada contorno un arrays de puntos (x,y)
+#CHAIN_APPROX_SIMPLE solo guarda vertices necesarios (que cambian direccion)
+#Hierarchy es un array (1,n,4) n es la cantidad de contornos
 contours, hierarchy = cv2.findContours(zona_guion_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+# [next, previous, first_child, parent]
+# next: índice del siguiente contorno al mismo nivel jerárquico (-1 si no hay)
+# previous: índice del anterior al mismo nivel (-1 si no hay)
+# first_child: índice del primer contorno hijo (interior) (-1 si no tiene)
+# parent: índice del contorno padre (-1 si es raíz)
+
 print(f"Cantidad de contornos: {len(contours)}")
 print(f"Jerarquía: {hierarchy}")
 #jerarquia de contornos: [next, previous, first_child, parent]
@@ -325,15 +364,16 @@ elif n_huecos == 0:
     letra_detectada = 'C'
 print(f"Letra detectada: {letra_detectada}")
 
-#CELDA 4
+#Analisis celda 4
 celda4_th = (celdas[4] < 200).astype(np.uint8)
 _, _, stats_c4, _ = cv2.connectedComponentsWithStats(celda4_th, 8, cv2.CV_32S)
 stats_c4_filtradas = stats_c4[(stats_c4[:, 4] > 50) & (stats_c4[:, 4] < 200)]
 guion4 = stats_c4_filtradas[(stats_c4_filtradas[:, 2] > 50) & (stats_c4_filtradas[:, 3] <= 2)]
 print(f"Guión: {guion4}")
 
+#Crop del guion y zona de respuesta.
 x_g, y_g, w_g = guion4[0,0], guion4[0,1], guion4[0,2]
-zona4 = celdas[4][y_g-15:y_g, x_g:x_g+w_g]
+zona4 = celdas[4][y_g-14:y_g, x_g:x_g+w_g]
 
 plt.figure(figsize=(4,3))
 plt.imshow(zona4, cmap='gray')
@@ -344,21 +384,23 @@ plt.show()
 zona4_th = (zona4 < 200).astype(np.uint8)
 contours4, hierarchy4 = cv2.findContours(zona4_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
+#Clasificamos por tamanio y forma (no terminamos utilizando en la resolucion del tp)
 contorno_externo = [i for i, h in enumerate(hierarchy4[0]) if h[3] == -1][0]
 x, y, w, h = cv2.boundingRect(contours4[contorno_externo])
 print(f"w={w}, h={h}")
 
 
 
-#Celda 8
+# Analisis Celda 8
 celda8_th = (celdas[8] < 200).astype(np.uint8)
 _, _, stats_c8, _ = cv2.connectedComponentsWithStats(celda8_th, 8, cv2.CV_32S)
 stats_c8_filtradas = stats_c8[(stats_c8[:, 4] > 50) & (stats_c8[:, 4] < 200)]
 guion8 = stats_c8_filtradas[(stats_c8_filtradas[:, 2] > 50) & (stats_c8_filtradas[:, 3] <= 2)]
 print(f"Guión: {guion8}")
 
+#Detectamos ruido en la celda 8 y descubrimos que debe ser y_g-14 para agarrar solo el alto de la zona de respuesta.
 x_g, y_g, w_g = guion8[0,0], guion8[0,1], guion8[0,2]
-zona8 = celdas[8][y_g-15:y_g, x_g:x_g+w_g]
+zona8 = celdas[8][y_g-14:y_g, x_g:x_g+w_g]
 
 plt.figure(figsize=(4,3))
 plt.imshow(zona8, cmap='gray')
@@ -377,14 +419,14 @@ _, _, stats_c6, _ = cv2.connectedComponentsWithStats(celda6_th, 8, cv2.CV_32S)
 stats_c6_filtradas = stats_c6[(stats_c6[:, 4] > 50) & (stats_c6[:, 4] < 200)]
 guion6 = stats_c6_filtradas[(stats_c6_filtradas[:, 2] > 50) & (stats_c6_filtradas[:, 3] <= 2)]
 x_g, y_g, w_g = guion6[0,0], guion6[0,1], guion6[0,2]
-zona6 = celdas[6][y_g-15:y_g, x_g:x_g+w_g]
+zona6 = celdas[6][y_g-14:y_g, x_g:x_g+w_g]
 zona6_th = (zona6 < 200).astype(np.uint8)
 contours6, hierarchy6 = cv2.findContours(zona6_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 print(f"Jerarquía: {hierarchy6}")
 n_externos = sum(1 for h in hierarchy6[0] if h[3] == -1)
 print(f"n_externos: {n_externos}")
 
-#Celda 2
+#Celda 2 con doble respuesta B y C
 celda2_th = (celdas[2] < 200).astype(np.uint8)
 _, _, stats_c2, _ = cv2.connectedComponentsWithStats(celda2_th, 8, cv2.CV_32S)
 stats_c2_filtradas = stats_c2[(stats_c2[:, 4] > 50) & (stats_c2[:, 4] < 200)]
@@ -427,8 +469,7 @@ print(f"Celda 1 - w={w}")
 
 print(f"Celda 2 - píxeles activos: {np.sum(zona2_th)}")
 print(f"Celda 1 - píxeles activos: {np.sum(zona_th)}")
-
-#exploracion examen 1
+"""###########################################################################################################"""
 #Exploracion examen 1
 img1 = cv2.imread('TP_1/examen_1.png', cv2.IMREAD_GRAYSCALE)    
 filas1, columnas1 = detectar_lineas(img1)
@@ -451,6 +492,7 @@ print(f"raw_v1: {raw_v1}")
 
 columnas = agrupar_lineas(raw_v1, gap=5).astype(int)
 
+# No leia el campo date
 img1 = cv2.imread('TP_1/examen_1.png', cv2.IMREAD_GRAYSCALE)
 filas1, columnas1 = detectar_lineas(img1)
 _, enc1 = extraer_celdas(img1, filas1, columnas1)
@@ -458,17 +500,20 @@ campo_date1 = enc1[:, 279:354]
 campo_date1_th = (campo_date1 < 200).astype(np.uint8)
 _, _, stats_date1, _ = cv2.connectedComponentsWithStats(campo_date1_th, 8, cv2.CV_32S)
 stats_date1_f = stats_date1[(stats_date1[:, 4] > 10) & (stats_date1[:, 4] < 50)]
-gaps1 = np.diff(stats_date1_f[:, 0])
+gaps1 = np.diff(stats_date1_f[:, 0]) #diferencia entre Xs consecutivas (espacio horizontal entre caracteres)
+
+#caracteres detecta un caracter de mas.
 print(f"Caracteres: {len(stats_date1_f)}")
 print(f"gaps: {gaps1}")
 
 print(stats_date1_f)
 
+#Campo class
 campo_class1 = enc1[:, 404:530]
 campo_class1_th = (campo_class1 < 200).astype(np.uint8)
 _, _, stats_class1, _ = cv2.connectedComponentsWithStats(campo_class1_th, 8, cv2.CV_32S)
-print(stats_class1)
 
+#detecta 2 caracteeres en lugar de uno.
 print(stats_class1)
 
 plt.figure(figsize=(3, 2))
@@ -494,14 +539,7 @@ plt.title('Proyección columnas encabezado 1')
 plt.tight_layout()
 plt.show()
 
-campo_name1 = enc1[:, int(enc1.shape[1]*0.08):int(enc1.shape[1]*0.43)]
-campo_name1_th = (campo_name1 < 200).astype(np.uint8)
-_, _, stats_name1, _ = cv2.connectedComponentsWithStats(campo_name1_th, 8, cv2.CV_32S)
-stats_name1_f = stats_name1[(stats_name1[:, 4] > 20) & (stats_name1[:, 4] < 100)]
-gaps_name1 = np.diff(stats_name1_f[:, 0])
-print(f"gaps: {gaps_name1}")
-print(f"max gap: {gaps_name1.max()}")
-
+#Analizamos campo name (examen 1)
 campo_name1 = enc1[:, 42:217]
 campo_name1_th = (campo_name1 < 200).astype(np.uint8)
 _, _, stats_name1, _ = cv2.connectedComponentsWithStats(campo_name1_th, 8, cv2.CV_32S)
@@ -512,6 +550,7 @@ gaps_name1 = np.diff(stats_name1_f[:, 0])
 print(f"gaps: {gaps_name1}")
 print(f"n_palabras: {np.sum(gaps_name1 > 15) + 1}")
 
+#detectamos y concluimos que hay una palabra en campo name
 plt.figure(figsize=(6, 2))
 plt.imshow(campo_name1, cmap='gray')
 plt.title('Campo name examen 1')
@@ -543,6 +582,7 @@ plt.title('Encabezado examen 5')
 plt.axis('off')
 plt.show()
 
+#No lee la fecha porque esta mas alta que las otras.
 campo_date5 = enc5[:, 279:354]
 campo_date5_th = (campo_date5 < 200).astype(np.uint8)
 _, _, stats_date5, _ = cv2.connectedComponentsWithStats(campo_date5_th, 8, cv2.CV_32S)
@@ -554,6 +594,8 @@ print(stats_date5_filtradas)
 
 gaps_date5 = np.diff(stats_date5_filtradas[:, 0])
 print(f"gaps: {gaps_date5}")
+
+#detectamos un espacio en la fecha
 print(f"n_espacios: {np.sum(gaps_date5 > 15)}")
 
 for i, path in enumerate(['TP_1/examen_1.png', 'TP_1/examen_2.png', 'TP_1/examen_3.png', 
@@ -569,6 +611,7 @@ filas2, columnas2 = detectar_lineas(img2)
 celdas2, _ = extraer_celdas(img2, filas2, columnas2)
 print(detectar_letra(celdas2[2]))
 
+#Detectamos dos respuestas en la en el mismo bloque de respuesta.
 celda2_th = (celdas2[2] < 200).astype(np.uint8)
 _, _, stats_c2, _ = cv2.connectedComponentsWithStats(celda2_th, 8, cv2.CV_32S)
 stats_c2_f = stats_c2[(stats_c2[:, 4] > 50) & (stats_c2[:, 4] < 200)]
@@ -582,7 +625,44 @@ plt.title('Zona celda 2')
 plt.axis('off')
 plt.show()
 
+#Intentamos distinguir por contornos
 zona2_th = (zona2 < 200).astype(np.uint8)
 contours2, hierarchy2 = cv2.findContours(zona2_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 for i, (c, h) in enumerate(zip(contours2, hierarchy2[0])):
     print(f"Contorno {i}: area={cv2.contourArea(c):.1f} padre={h[3]}")
+
+# Inspeccionamos celda 6 y 8 examen 3, dan mal pero deberian dar bien
+img = cv2.imread('TP_1/examen_2.png', cv2.IMREAD_GRAYSCALE)
+filas, columnas = detectar_lineas(img)
+celdas, encabezado = extraer_celdas(img, filas, columnas)
+
+celda = celdas[6]
+celda_th = (celda < 200).astype(np.uint8)
+
+_, _, stats, _ = cv2.connectedComponentsWithStats(celda_th, 8, cv2.CV_32S)
+stats_filtradas = stats[(stats[:, 4] > 50) & (stats[:, 4] < 200)]
+print("stats_filtradas:\n", stats_filtradas)
+
+guion = stats_filtradas[(stats_filtradas[:, 2] > 50) & (stats_filtradas[:, 3] <= 2)]
+print("guion:\n", guion)
+
+x_guion = guion[0, 0]
+y_guion = guion[0, 1]
+w_guion = guion[0, 2]
+
+print(f"x={x_guion}, y={y_guion}, w={w_guion}")
+print(f"zona: [{y_guion-15}:{y_guion}]")
+
+zona = celda[y_guion-14:y_guion, x_guion:x_guion + w_guion]
+zona_th = (zona < 200).astype(np.uint8)
+
+plt.imshow(zona, cmap='gray')
+plt.title('Zona')
+plt.axis('off')
+plt.show()
+
+print(f"pixeles activos: {np.sum(zona_th)}")
+
+zona_th = (zona < 200).astype(np.uint8)
+_, _, stats_zona, _ = cv2.connectedComponentsWithStats(zona_th, 8, cv2.CV_32S)
+print(stats_zona)

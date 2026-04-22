@@ -108,7 +108,7 @@ def detectar_campos(encabezado):
     """
     enc_th = (encabezado < 200).astype(np.uint8)
     enc_rows = np.sum(enc_th, axis=1) # Proyección horizontal: suma de píxeles activos por fila
-    fila_linea = np.where(enc_rows > 200)[0][0] # fila mas densa (linea del campo)
+    fila_linea = np.where(enc_rows > 200)[0][0] # el indice de la primera fila mas densa (linea del campo)
     fila = enc_th[fila_linea, :] # extraigo fila binaria
     diff_fila = np.diff(fila, prepend=0, append=0) # Derivada discreta: detecta flancos +1 (0→1) y -1 (1→0) ->prepend y append acomodan flancos inicio y fin
     inicios_campos = np.where(diff_fila == 1)[0] 
@@ -148,7 +148,7 @@ def validar_encabezado(encabezado):
     else:
         gaps = np.diff(stats_name[:, 0])
         n_palabras = np.sum(gaps > 15) + 1
-        name_ok = n_palabras == 2 and len(stats_name) <= 25
+        name_ok = n_palabras == 2 and len(stats_name) <= 25 
 
     # --- Date ---
     campo_date_th = (campo_date < 200).astype(np.uint8)
@@ -219,6 +219,7 @@ def detectar_letra(celda):
         return 'MAL'
 
     # RETR_TREE recupera la jerarquía completa: permite distinguir
+    #[next, previous, first_child, parent]
     contours, hierarchy = cv2.findContours(zona_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     if hierarchy is None or len(contours) == 0:

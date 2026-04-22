@@ -47,7 +47,7 @@ def ecualizacion_local(img, M, N):
     left   = N // 2
     right  = N // 2
 
-    #Bordes repitiendo el valor del pixel
+    #Bordes repitiendo el valor del pixel (padding)
     img_pad = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_REPLICATE)
 
     # dimensiones imagen
